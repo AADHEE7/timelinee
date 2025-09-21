@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoQuest 6.0 (Accuracy Patch)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a69bd;
+            --secondary-color: #e9eef7;
+            --accent-color: #f9ca24;
+            --correct-color: #2ecc71;
+            --perfect-color: #f1c40f;
+            --incorrect-color: #e74c3c;
+            --font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--secondary-color);
+            background-image: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        #game-container {
+            background: #ffffff;
+            padding: 2rem 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            width: 95%;
+            max-width: 1200px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+            position: relative;
+        }
+
+        /* --- Setup Screen --- */
+        #setup-screen h1 { color: var(--primary-color); font-weight: 700; font-size: 2.5rem; }
+        #setup-screen p { font-size: 1.1rem; color: #555; }
+        .input-group { margin: 25px 0; display: flex; justify-content: center; gap: 15px; }
+        .input-group input {
+            padding: 12px; font-size: 1rem; font-family: var(--font-family);
+            border: 2px solid #ddd; border-radius: 10px; text-align: center;
+            width: 130px; transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .input-group input:focus {
+            outline: none; border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(74, 105, 189, 0.2);
+        }
+        #start-game-btn, #play-again-btn {
+            padding: 14px 30px; font-size: 1.1rem; font-weight: 600; color: white;
+            background: linear-gradient(45deg, var(--primary-color), #6a89cc);
+            border: none; border-radius: 10px; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 15px rgba(74, 105, 189, 0.3);
+        }
+        #start-game-btn:hover, #play-again-btn:hover {
+            transform: translateY(-2px); box-shadow: 0 6px 20px rgba(74, 105, 189, 0.4);
+        }
+        .error-message { color: var(--incorrect-color); margin-top: 15px; height: 20px; font-weight: 600; }
+
+        /* --- Game Screen --- */
+        #game-screen { position: relative; }
+        .game-header { margin-bottom: 25px; }
+        #current-event-card {
+            padding: 18px; font-size: 1.3rem; font-weight: 600; background-color: var(--accent-color);
+            color: #333; border-radius: 12px; margin: 15px auto; max-width: 700px;
+            box-shadow: 0 4px 10px rgba(249, 202, 36, 0.2);
+        }
+        .score-container { font-size: 1.8rem; font-weight: 700; color: var(--primary-color); }
+        #timeline-wrapper {
+            width: 100%; overflow-x: auto; border: 2px solid #e9ecef;
+            border-radius: 12px; background: #fafafa; padding: 25px 0; margin-bottom: 20px;
+            position: relative;
+        }
+        #timeline { display: flex; position: relative; height: 100px; cursor: crosshair; }
+        .year-marker {
+            position: relative; width: 100px; border-left: 1px solid #ced4da;
+            box-sizing: border-box;
+        }
+        .year-marker::after {
+            content: attr(data-year); position: absolute; bottom: -25px; left: 50%;
+            transform: translateX(-50%); font-size: 0.9rem; font-weight: 600; color: #6c757d;
+        }
+        .placed-event {
+            position: absolute; top: 10px; transform: translateX(-50%); padding: 6px 10px;
+            background: linear-gradient(45deg, var(--correct-color), #27ae60);
+            color: white; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+            white-space: nowrap; cursor: pointer; z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .info-btn {
+            display: inline-block; background: white; color: var(--primary-color); border-radius: 50%;
+            width: 18px; height: 18px; line-height: 18px; text-align: center;
+            font-weight: bold; margin-left: 5px; font-style: normal;
+        }
+
+        /* --- Guess Indicator --- */
+        #guess-indicator {
+            position: absolute; top: 0; bottom: 0; left: 0;
+            width: 2px; background-color: var(--primary-color);
+            z-index: 50; pointer-events: none; opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #guess-indicator-year {
+            position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+            background-color: var(--primary-color); color: white; padding: 2px 8px;
+            border-radius: 5px; font-size: 0.9rem; font-weight: 600;
+        }
+        #timeline:hover #guess-indicator {
+            opacity: 1;
+        }
+
+        /* --- Correct Answer Feedback --- */
+        #correct-answer-feedback {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+            background-color: rgba(0, 0, 0, 0.8); color: white; padding: 20px 40px;
+            border-radius: 15px; font-size: 2.5rem; font-weight: 700; z-index: 200;
+            opacity: 0; visibility: hidden; transition: all 0.3s ease-out; white-space: nowrap;
+        }
+        #correct-answer-feedback.visible {
+            opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1);
+        }
+        #correct-answer-feedback.perfect {
+            background-color: var(--perfect-color); color: #333;
+        }
+        
+        /* --- Modal --- */
+        .modal {
+            position: fixed; z-index: 300; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); display: flex; justify-content: center;
+            align-items: center; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s;
+        }
+        .modal.visible { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: white; padding: 30px; border-radius: 15px; max-width: 500px;
+            position: relative; text-align: left; transform: scale(0.9); transition: transform 0.3s;
+        }
+        .modal.visible .modal-content { transform: scale(1); }
+        .close-button { position: absolute; top: 10px; right: 20px; font-size: 2.5rem; font-weight: 300; cursor: pointer; }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="setup-screen">
+            <h1>ChronoQuest 🗺️</h1>
+            <p>Select a time period and test your historical knowledge!</p>
+            <div class="input-group">
+                <input type="number" id="start-year" placeholder="Start Year" min="1900" max="1961" value="1920">
+                <input type="number" id="end-year" placeholder="End Year" min="1900" max="1961" value="1940">
+            </div>
+            <button id="start-game-btn">🚀 Start Quest</button>
+            <div id="setup-error" class="error-message"></div>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <div class="game-header">
+                <h2>Place this event on the timeline:</h2>
+                <div id="current-event-card"></div>
+                <div class="score-container">Score: <span id="score">0</span></div>
+            </div>
+            <div id="timeline-wrapper">
+                <div id="timeline"></div>
+                <div id="guess-indicator">
+                    <div id="guess-indicator-year"></div>
+                </div>
+            </div>
+            <div id="correct-answer-feedback"></div>
+        </div>
+
+        <div id="win-screen" class="hidden">
+            <h2>🎉 Quest Complete! 🎉</h2>
+            <p style="font-size: 1.5rem;">Final Score: <strong id="final-score"></strong></p>
+            <button id="play-again-btn">Play a New Quest</button>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 id="modal-title"></h3>
+            <p id="modal-details"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const allEvents = [
+                { year: 1905, event: 'Partition of Bengal', details: 'The partition of the Bengal Presidency was a territorial reorganization by British authorities that sparked massive protests.' },
+                { year: 1906, event: 'Swadeshi Steam Navigation Company', details: 'An early Indian-owned shipping company started by V. O. Chidambaram Pillai during the Swadeshi movement.' },
+                { year: 1914, event: 'Outbreak of World War I', details: 'A global war centered in Europe that began on 28 July 1914 and lasted until 11 November 1918.' },
+                { year: 1916, event: 'Home Rule League / Lucknow Pact', details: 'A movement to obtain self-government for India within the British Empire, and a pact between the Congress and Muslim League.' },
+                { year: 1917, event: 'Russian Revolution', details: 'A period of political and social revolution across the Russian Empire, which led to the establishment of the Soviet Union.' },
+                { year: 1918, event: 'End of World War I', details: 'The armistice signed at Compiègne, France, which ended fighting on land, sea and air in World War I.' },
+                { year: 1919, event: 'Treaty of Versailles / Jallianwala Bagh', details: 'The treaty that ended WWI, and a tragic massacre of unarmed Indian civilians by British troops in Amritsar.' },
+                { year: 1920, event: 'Khilafat & Non-Cooperation Movement', details: 'A major pan-Islamic political protest campaign and a nationwide non-violent movement led by Mahatma Gandhi.' },
+                { year: 1922, event: 'Chauri Chaura incident', details: 'An incident where protesters clashed with police, leading Gandhi to call off the Non-Cooperation Movement.' },
+                { year: 1927, event: 'Simon Commission appointment', details: 'A group of seven British MPs sent to India to study constitutional reform, boycotted by Indians for its lack of native members.' },
+                { year: 1929, event: 'The Great Depression / Lahore Congress', details: 'A severe worldwide economic depression, and the Congress session where the goal of Purna Swaraj (complete independence) was declared.' },
+                { year: 1930, event: 'Salt Satyagraha (Dandi March)', details: 'A major act of nonviolent civil disobedience led by Mahatma Gandhi to protest the British salt tax.' },
+                { year: 1931, event: 'Gandhi-Irwin Pact', details: 'A political agreement signed before the second Round Table Conference in London.' },
+                { year: 1932, event: 'Poona Pact', details: 'An agreement between Mahatma Gandhi and B. R. Ambedkar on behalf of depressed classes and upper caste Hindu leaders on the reservation of electoral seats.' },
+                { year: 1935, event: 'Government of India Act', details: 'An act passed by the British Parliament that granted a large measure of autonomy to the provinces of British India.' },
+                { year: 1939, event: 'Outbreak of World War II', details: 'A global war that lasted from 1939 to 1945, involving the vast majority of the world\'s countries.' },
+                { year: 1941, event: 'Pearl Harbour Attack', details: 'A surprise military strike by the Imperial Japanese Navy Air Service upon the United States naval base at Pearl Harbor, Hawaii.' },
+                { year: 1942, event: 'Quit India Movement', details: 'A movement launched at the Bombay session of the All-India Congress Committee by Mahatma Gandhi during WWII, demanding an end to British rule.' },
+                { year: 1945, event: 'End of World War II / UNO Formation', details: 'The surrender of the Axis powers marked the end of the war, leading to the formation of the United Nations to prevent future conflicts.' },
+                { year: 1947, event: 'India won Independence', details: 'The Indian Independence Act 1947 partitioned British India into two new independent dominions of India and Pakistan.' },
+                { year: 1955, event: 'Warsaw Pact', details: 'A collective defense treaty signed in Warsaw, Poland among the Soviet Union and seven other Eastern Bloc socialist republics of Central and Eastern Europe.' },
+                { year: 1961, event: 'Belgrade Conference', details: 'The first conference of the Non-Aligned Movement, a group of states which are not formally aligned with or against any major power bloc.' }
+            ];
+
+            const setupScreen = document.getElementById('setup-screen'),
+                  gameScreen = document.getElementById('game-screen'),
+                  winScreen = document.getElementById('win-screen'),
+                  startBtn = document.getElementById('start-game-btn'),
+                  playAgainBtn = document.getElementById('play-again-btn'),
+                  startYearInput = document.getElementById('start-year'),
+                  endYearInput = document.getElementById('end-year'),
+                  timeline = document.getElementById('timeline'),
+                  currentEventCard = document.getElementById('current-event-card'),
+                  scoreDisplay = document.getElementById('score'),
+                  finalScoreDisplay = document.getElementById('final-score'),
+                  setupError = document.getElementById('setup-error'),
+                  infoModal = document.getElementById('info-modal'),
+                  closeModalBtn = document.querySelector('.close-button'),
+                  feedbackEl = document.getElementById('correct-answer-feedback'),
+                  guessIndicator = document.getElementById('guess-indicator'),
+                  guessIndicatorYear = document.getElementById('guess-indicator-year');
+
+            const correctEmojis = ['🎯', '👍', '👌'],
+                  correctStreakEmojis = ['🚀', '🔥', '🤩', '👑'],
+                  incorrectEmojis = ['🤔', '🧐', '👀'],
+                  incorrectStreakEmojis = ['💡', '🧠', '💪', '🌱'];
+            
+            let correctStreak = 0, incorrectStreak = 0,
+                gameEvents = [], currentEventIndex = 0, score = 0,
+                YEAR_WIDTH = 100;
+
+            startBtn.addEventListener('click', initializeGame);
+            playAgainBtn.addEventListener('click', () => {
+                winScreen.classList.add('hidden');
+                setupScreen.classList.remove('hidden');
+            });
+            timeline.addEventListener('click', handleTimelineClick);
+            timeline.addEventListener('mousemove', handleTimelineHover);
+            closeModalBtn.addEventListener('click', () => infoModal.classList.remove('visible'));
+            window.addEventListener('click', (e) => {
+                if (e.target === infoModal) infoModal.classList.remove('visible');
+            });
+
+            function initializeGame() {
+                const startYear = parseInt(startYearInput.value);
+                const endYear = parseInt(endYearInput.value);
+                if (!startYear || !endYear || startYear >= endYear || endYear - startYear < 2) {
+                    setupError.textContent = 'Please enter a valid range of at least 2 years.';
+                    return;
+                }
+                gameEvents = allEvents.filter(e => e.year >= startYear && e.year <= endYear);
+                if (gameEvents.length < 2) {
+                    setupError.textContent = 'Not enough events in this range. Try a wider one.';
+                    return;
+                }
+                
+                setupError.textContent = '';
+                gameEvents.sort(() => Math.random() - 0.5);
+                currentEventIndex = 0;
+                score = 0;
+                correctStreak = 0;
+                incorrectStreak = 0;
+                updateScore(0, true);
+
+                setupScreen.classList.add('hidden');
+                winScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                createTimeline(startYear, endYear);
+                presentNextEvent();
+            }
+
+            function createTimeline(start, end) {
+                timeline.innerHTML = '';
+                timeline.style.width = `${(end - start + 1) * YEAR_WIDTH}px`;
+                for (let year = start; year <= end; year++) {
+                    const marker = document.createElement('div');
+                    marker.classList.add('year-marker');
+                    if (year % 5 === 0 || year === start || year === end) {
+                        marker.dataset.year = year;
+                    }
+                    timeline.appendChild(marker);
+                }
+            }
+            
+            function updateScore(points, isReset = false) {
+                score = isReset ? 0 : score + points;
+                scoreDisplay.textContent = score;
+                if (!isReset) {
+                    scoreDisplay.style.color = points > 0 ? 'var(--correct-color)' : points < 0 ? 'var(--incorrect-color)' : 'var(--primary-color)';
+                    setTimeout(() => scoreDisplay.style.color = 'var(--primary-color)', 500);
+                }
+            }
+
+            function presentNextEvent() {
+                if (currentEventIndex >= gameEvents.length) {
+                    endGame();
+                    return;
+                }
+                currentEventCard.textContent = gameEvents[currentEventIndex].event;
+            }
+
+            function getYearFromX(x) {
+                const startYear = parseInt(startYearInput.value);
+                return Math.floor(x / YEAR_WIDTH) + startYear;
+            }
+
+            function handleTimelineHover(e) {
+                // ** ACCURATE HOVER ** using e.offsetX relative to the timeline
+                const hoverX = e.offsetX;
+                const year = getYearFromX(hoverX);
+                guessIndicator.style.transform = `translateX(${hoverX}px)`;
+                guessIndicatorYear.textContent = year;
+            }
+
+            function handleTimelineClick(e) {
+                if (currentEventIndex >= gameEvents.length) return;
+                timeline.style.pointerEvents = 'none';
+
+                // ** ACCURATE CLICK ** using e.offsetX relative to the timeline
+                const clickX = e.offsetX;
+                const guessedYear = getYearFromX(clickX);
+                const correctEvent = gameEvents[currentEventIndex];
+
+                const yearDifference = Math.abs(guessedYear - correctEvent.year);
+                let points = 0;
+                if (yearDifference === 0) { // Perfect
+                    points = 100;
+                } else if (yearDifference <= 5) { // Close
+                    points = 50 - (yearDifference * 10);
+                } else { // Wrong
+                    points = -((yearDifference - 5) * 5);
+                }
+                updateScore(points);
+                
+                let chosenEmoji = '';
+                if (yearDifference === 0) { // Streak only for perfect
+                    correctStreak++;
+                    incorrectStreak = 0;
+                    const emojiSet = correctStreak >= 3 ? correctStreakEmojis : correctEmojis;
+                    chosenEmoji = emojiSet[Math.floor(Math.random() * emojiSet.length)];
+                    feedbackEl.classList.add('perfect');
+                } else {
+                    incorrectStreak++;
+                    correctStreak = 0;
+                    const emojiSet = incorrectStreak >= 3 ? incorrectStreakEmojis : incorrectEmojis;
+                    chosenEmoji = emojiSet[Math.floor(Math.random() * emojiSet.length)];
+                    feedbackEl.classList.remove('perfect');
+                }
+
+                feedbackEl.innerHTML = `${chosenEmoji} <span>${correctEvent.year}</span>`;
+                feedbackEl.classList.add('visible');
+                
+                currentEventIndex++;
+
+                setTimeout(() => {
+                    feedbackEl.classList.remove('visible');
+                    placeEventOnTimeline(correctEvent);
+                }, 1200);
+
+                setTimeout(() => {
+                    presentNextEvent();
+                    timeline.style.pointerEvents = 'auto';
+                }, 2000);
+            }
+            
+            function placeEventOnTimeline(eventData) {
+                const startYear = parseInt(startYearInput.value);
+                const leftPosition = (eventData.year - startYear + 0.5) * YEAR_WIDTH;
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('placed-event');
+                eventEl.style.left = `${leftPosition}px`;
+                eventEl.innerHTML = `${eventData.event} <span class="info-btn">i</span>`;
+                eventEl.querySelector('.info-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    infoModal.classList.add('visible');
+                    document.getElementById('modal-title').textContent = eventData.event;
+                    document.getElementById('modal-details').textContent = eventData.details;
+                });
+                timeline.appendChild(eventEl);
+            }
+
+            function endGame() {
+                gameScreen.classList.add('hidden');
+                winScreen.classList.remove('hidden');
+                finalScoreDisplay.textContent = score;
+            }
+        });
+    </script>
+</body>
+</html>

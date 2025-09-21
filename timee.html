@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoQuest</title>
+    <style>
+        :root {
+            --primary-color: #0056b3;
+            --secondary-color: #f0f2f5;
+            --correct-color: #28a745;
+            --incorrect-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--secondary-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        #game-container {
+            background: white;
+            padding: 2rem 3rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+            width: 95%;
+            max-width: 1200px;
+            text-align: center;
+        }
+
+        /* --- Setup Screen --- */
+        #setup-screen h1 {
+            color: var(--primary-color);
+        }
+        .input-group {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .input-group input {
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            text-align: center;
+            width: 120px;
+        }
+        #start-game-btn, #play-again-btn {
+            padding: 12px 25px;
+            font-size: 1.1rem;
+            color: white;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #start-game-btn:hover, #play-again-btn:hover {
+            background-color: #004494;
+        }
+        .error-message {
+            color: var(--incorrect-color);
+            margin-top: 15px;
+            height: 20px;
+        }
+
+        /* --- Game Screen --- */
+        .game-header {
+            margin-bottom: 20px;
+        }
+        #current-event-card {
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: #ffc107;
+            color: #333;
+            border-radius: 8px;
+            margin: 10px auto;
+            max-width: 600px;
+        }
+        .score-container {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        #timeline-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            padding: 20px 0;
+        }
+        #timeline {
+            display: flex;
+            position: relative;
+            height: 100px;
+            cursor: crosshair;
+        }
+        .year-marker {
+            position: relative;
+            width: 100px; /* Width of each year segment */
+            border-left: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+        .year-marker::after {
+            content: attr(data-year);
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            color: #666;
+        }
+        .placed-event {
+            position: absolute;
+            top: 10px;
+            transform: translateX(-50%);
+            padding: 5px 8px;
+            background-color: var(--correct-color);
+            color: white;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .info-btn {
+            display: inline-block;
+            background: white;
+            color: var(--primary-color);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            line-height: 16px;
+            text-align: center;
+            font-weight: bold;
+            margin-left: 5px;
+            font-style: italic;
+        }
+        
+        /* --- Feedback Line --- */
+        .feedback-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, #ffc107, var(--correct-color));
+            top: 40px;
+            transform-origin: left center;
+            z-index: 5;
+            animation: growLine 0.8s ease-out forwards;
+        }
+
+        @keyframes growLine {
+            from {
+                width: 0;
+            }
+            to {
+                /* width is set by JS */
+            }
+        }
+
+        /* --- Modal --- */
+        .modal {
+            position: fixed;
+            z-index: 100;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            position: relative;
+            text-align: left;
+        }
+        .close-button {
+            position: absolute;
+            top: 10px; right: 15px;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        /* --- Utility Classes --- */
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="setup-screen">
+            <h1>ChronoQuest 🗺️</h1>
+            <p>Select a time period you want to explore.</p>
+            <div class="input-group">
+                <input type="number" id="start-year" placeholder="Start Year" min="1900" max="1961" value="1905">
+                <input type="number" id="end-year" placeholder="End Year" min="1900" max="1961" value="1947">
+            </div>
+            <button id="start-game-btn">Generate Quest</button>
+            <div id="setup-error" class="error-message"></div>
+        </div>
+
+        <div id="game-screen" class="hidden">
+            <div class="game-header">
+                <h2 id="current-event-title">Place this event on the timeline:</h2>
+                <div id="current-event-card"></div>
+                <div class="score-container">Score: <span id="score">0</span></div>
+            </div>
+            <div id="timeline-wrapper">
+                <div id="timeline"></div>
+            </div>
+            <div id="feedback-message"></div>
+        </div>
+
+        <div id="win-screen" class="hidden">
+            <h2>Quest Complete!</h2>
+            <p>Final Score: <strong id="final-score"></strong></p>
+            <button id="play-again-btn">Play a New Quest</button>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 id="modal-title"></h3>
+            <p id="modal-details"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA: All events from your timeline ---
+            const allEvents = [
+                { year: 1905, event: 'Partition of Bengal', details: 'The partition of the Bengal Presidency was a territorial reorganization by British authorities that sparked massive protests.' },
+                { year: 1906, event: 'Swadeshi Steam Navigation Company', details: 'An early Indian-owned shipping company started by V. O. Chidambaram Pillai during the Swadeshi movement.' },
+                { year: 1914, event: 'Outbreak of World War I', details: 'A global war centered in Europe that began on 28 July 1914 and lasted until 11 November 1918.' },
+                { year: 1916, event: 'Home Rule League / Lucknow Pact', details: 'A movement to obtain self-government for India within the British Empire, and a pact between the Congress and Muslim League.' },
+                { year: 1917, event: 'Russian Revolution', details: 'A period of political and social revolution across the Russian Empire, which led to the establishment of the Soviet Union.' },
+                { year: 1918, event: 'End of World War I', details: 'The armistice signed at Compiègne, France, which ended fighting on land, sea and air in World War I.' },
+                { year: 1919, event: 'Treaty of Versailles / Jallianwala Bagh', details: 'The treaty that ended WWI, and a tragic massacre of unarmed Indian civilians by British troops in Amritsar.' },
+                { year: 1920, event: 'Khilafat & Non-Cooperation Movement', details: 'A major pan-Islamic political protest campaign and a nationwide non-violent movement led by Mahatma Gandhi.' },
+                { year: 1922, event: 'Chauri Chaura incident', details: 'An incident where protesters clashed with police, leading Gandhi to call off the Non-Cooperation Movement.' },
+                { year: 1927, event: 'Simon Commission appointment', details: 'A group of seven British MPs sent to India to study constitutional reform, boycotted by Indians for its lack of native members.' },
+                { year: 1929, event: 'The Great Depression / Lahore Congress', details: 'A severe worldwide economic depression, and the Congress session where the goal of Purna Swaraj (complete independence) was declared.' },
+                { year: 1930, event: 'Salt Satyagraha (Dandi March)', details: 'A major act of nonviolent civil disobedience led by Mahatma Gandhi to protest the British salt tax.' },
+                { year: 1931, event: 'Gandhi-Irwin Pact', details: 'A political agreement signed before the second Round Table Conference in London.' },
+                { year: 1932, event: 'Poona Pact', details: 'An agreement between Mahatma Gandhi and B. R. Ambedkar on behalf of depressed classes and upper caste Hindu leaders on the reservation of electoral seats.' },
+                { year: 1935, event: 'Government of India Act', details: 'An act passed by the British Parliament that granted a large measure of autonomy to the provinces of British India.' },
+                { year: 1939, event: 'Outbreak of World War II', details: 'A global war that lasted from 1939 to 1945, involving the vast majority of the world\'s countries.' },
+                { year: 1941, event: 'Pearl Harbour Attack', details: 'A surprise military strike by the Imperial Japanese Navy Air Service upon the United States naval base at Pearl Harbor, Hawaii.' },
+                { year: 1942, event: 'Quit India Movement', details: 'A movement launched at the Bombay session of the All-India Congress Committee by Mahatma Gandhi during WWII, demanding an end to British rule.' },
+                { year: 1945, event: 'End of World War II / UNO Formation', details: 'The surrender of the Axis powers marked the end of the war, leading to the formation of the United Nations to prevent future conflicts.' },
+                { year: 1947, event: 'India won Independence', details: 'The Indian Independence Act 1947 partitioned British India into two new independent dominions of India and Pakistan.' },
+                { year: 1955, event: 'Warsaw Pact', details: 'A collective defense treaty signed in Warsaw, Poland among the Soviet Union and seven other Eastern Bloc socialist republics of Central and Eastern Europe.' },
+                { year: 1961, event: 'Belgrade Conference', details: 'The first conference of the Non-Aligned Movement, a group of states which are not formally aligned with or against any major power bloc.' }
+            ];
+
+            // --- DOM Elements ---
+            const setupScreen = document.getElementById('setup-screen');
+            const gameScreen = document.getElementById('game-screen');
+            const winScreen = document.getElementById('win-screen');
+            const startBtn = document.getElementById('start-game-btn');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const startYearInput = document.getElementById('start-year');
+            const endYearInput = document.getElementById('end-year');
+            const timeline = document.getElementById('timeline');
+            const currentEventCard = document.getElementById('current-event-card');
+            const scoreDisplay = document.getElementById('score');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const setupError = document.getElementById('setup-error');
+            const infoModal = document.getElementById('info-modal');
+            const closeModalBtn = document.querySelector('.close-button');
+
+            // --- Game State Variables ---
+            let gameEvents = [];
+            let currentEventIndex = 0;
+            let score = 0;
+            const YEAR_WIDTH = 100; // px width per year on the timeline
+
+            // --- Event Listeners ---
+            startBtn.addEventListener('click', initializeGame);
+            playAgainBtn.addEventListener('click', () => {
+                winScreen.classList.add('hidden');
+                setupScreen.classList.remove('hidden');
+            });
+            timeline.addEventListener('click', handleTimelineClick);
+            closeModalBtn.addEventListener('click', () => infoModal.classList.add('hidden'));
+            window.addEventListener('click', (e) => {
+                if (e.target === infoModal) {
+                    infoModal.classList.add('hidden');
+                }
+            });
+
+            // --- Game Logic Functions ---
+            function initializeGame() {
+                const startYear = parseInt(startYearInput.value);
+                const endYear = parseInt(endYearInput.value);
+
+                // Validation
+                if (!startYear || !endYear || startYear >= endYear) {
+                    setupError.textContent = 'Please enter a valid year range.';
+                    return;
+                }
+
+                gameEvents = allEvents.filter(e => e.year >= startYear && e.year <= endYear);
+
+                if (gameEvents.length < 2) {
+                    setupError.textContent = 'Not enough events in this range. Try a wider range (e.g., 1905-1930).';
+                    return;
+                }
+                
+                setupError.textContent = '';
+                gameEvents.sort(() => Math.random() - 0.5); // Shuffle events
+                currentEventIndex = 0;
+                score = 0;
+                scoreDisplay.textContent = score;
+
+                setupScreen.classList.add('hidden');
+                winScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                
+                createTimeline(startYear, endYear);
+                presentNextEvent();
+            }
+
+            function createTimeline(start, end) {
+                timeline.innerHTML = '';
+                timeline.style.width = `${(end - start + 1) * YEAR_WIDTH}px`;
+                for (let year = start; year <= end; year++) {
+                    const marker = document.createElement('div');
+                    marker.classList.add('year-marker');
+                    if (year % 5 === 0 || year === start || year === end) {
+                        marker.dataset.year = year;
+                    }
+                    timeline.appendChild(marker);
+                }
+            }
+
+            function presentNextEvent() {
+                if (currentEventIndex >= gameEvents.length) {
+                    endGame();
+                    return;
+                }
+                const event = gameEvents[currentEventIndex];
+                currentEventCard.textContent = event.event;
+            }
+
+            function handleTimelineClick(e) {
+                if (currentEventIndex >= gameEvents.length) return;
+
+                const timelineRect = timeline.getBoundingClientRect();
+                const clickX = e.clientX - timelineRect.left;
+                const startYear = parseInt(startYearInput.value);
+
+                const guessedYear = Math.round(clickX / YEAR_WIDTH) + startYear -1;
+                const correctEvent = gameEvents[currentEventIndex];
+
+                // Calculate Score
+                const yearDifference = Math.abs(guessedYear - correctEvent.year);
+                const points = Math.max(0, 100 - (yearDifference * 10)); // 10 points lost per year of difference
+                score += points;
+                scoreDisplay.textContent = score;
+
+                // Place the event on the timeline and show feedback
+                placeEventOnTimeline(correctEvent, clickX);
+
+                // Move to next event
+                currentEventIndex++;
+                timeline.style.pointerEvents = 'none'; // Disable clicking during animation
+                setTimeout(() => {
+                    presentNextEvent();
+                    timeline.style.pointerEvents = 'auto'; // Re-enable clicking
+                }, 1500); // Wait a moment before showing the next card
+            }
+            
+            function placeEventOnTimeline(eventData, clickX) {
+                const startYear = parseInt(startYearInput.value);
+                const correctX = (eventData.year - startYear + 0.5) * YEAR_WIDTH;
+                
+                // --- Visual feedback line ---
+                const line = document.createElement('div');
+                line.classList.add('feedback-line');
+                const distance = Math.abs(clickX - correctX);
+                const angle = (clickX > correctX) ? 180 : 0;
+                line.style.left = `${Math.min(clickX, correctX)}px`;
+                line.style.transform = `rotate(${angle}deg)`;
+                line.style.width = `${distance}px`; // Key for animation
+                timeline.appendChild(line);
+
+                // --- Event Card ---
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('placed-event');
+                eventEl.style.left = `${correctX}px`;
+                eventEl.innerHTML = `${eventData.event} <span class="info-btn">i</span>`;
+                
+                eventEl.querySelector('.info-btn').addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent the timeline click event
+                    document.getElementById('modal-title').textContent = eventData.event;
+                    document.getElementById('modal-details').textContent = eventData.details;
+                    infoModal.classList.remove('hidden');
+                });
+                
+                // Add elements after a short delay for effect
+                setTimeout(() => {
+                   timeline.appendChild(eventEl);
+                   setTimeout(() => line.remove(), 1000); // Remove the line after it's shown
+                }, 800);
+            }
+
+            function endGame() {
+                gameScreen.classList.add('hidden');
+                winScreen.classList.remove('hidden');
+                finalScoreDisplay.textContent = score;
+            }
+        });
+    </script>
+</body>
+</html>
